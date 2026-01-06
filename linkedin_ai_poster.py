@@ -4,9 +4,10 @@ LinkedIn AI Auto Poster
 Automatically generates and posts trending Android content to LinkedIn.
 
 Flow:
-1. DuckDuckGo Search → Get 5 trending topics
-2. Groq LLM → Pick best topic + Generate post
-3. LinkedIn API → Post to profile
+1. Google News Search → Get 5 trending topics
+2. Filter duplicates → Skip already posted topics
+3. Groq LLM → Pick best topic + Generate post
+4. LinkedIn API → Post to profile
 
 Author: Jasmeet Singh
 """
@@ -88,11 +89,15 @@ TOPIC_PICKER_PROMPT = """Based on these trending topics/news in Android developm
 ## TRENDING TOPICS:
 {topics}
 
+## ALREADY POSTED (DO NOT SELECT THESE):
+{posted_topics}
+
 ## SELECTION CRITERIA:
 1. Currently relevant/hot in the community
-2. Jasmeet can add personal perspective (Android dev with Compose, Health SDK experience)
-3. Will spark engagement (comments, discussions)
-4. Not too generic or overdone
+2. NOT similar to already posted topics
+3. Jasmeet can add personal perspective (Android dev with Compose, Health SDK experience)
+4. Will spark engagement (comments, discussions)
+5. Not too generic or overdone
 
 ## RESPOND IN THIS EXACT JSON FORMAT:
 {{
@@ -144,6 +149,67 @@ def save_json_file(filepath: str, data: dict):
         json.dump(data, f, indent=2)
 
 
+def get_posted_topics() -> list:
+    """Get list of previously posted topics to avoid duplicates"""
+    history = load_json_file(POST_HISTORY_FILE)
+    posted = []
+    for post in history.get("posts", []):
+        topic = post.get("topic", "")
+        if topic:
+            posted.append(topic)
+    return posted
+
+
+def is_similar_topic(title: str, posted_topics: list) -> bool:
+    """Check if a topic is similar to already posted ones"""
+    title_lower = title.lower()
+    title_words = set(title_lower.split())
+    
+    for posted in posted_topics:
+        posted_lower = posted.lower()
+        posted_words = set(posted_lower.split())
+        
+        # Check word overlap
+        common_words = title_words.intersection(posted_words)
+        # Remove common stop words from count
+        stop_words = {'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'and', 'is', 'are', 'with'}
+        meaningful_common = common_words - stop_words
+        
+        # If 3+ meaningful words match, consider it similar
+        if len(meaningful_common) >= 3:
+            return True
+        
+        # Also check if key terms match
+        key_terms = ['kotlin', 'compose', 'android', 'jetpack', 'flutter', 'java']
+        for term in key_terms:
+            if term in title_lower and term in posted_lower:
+                # Check if it's about the same version/feature
+                if any(word in title_lower and word in posted_lower for word in ['2.0', '2.3', 'update', 'release', 'new']):
+                    return True
+    
+    return False
+
+
+def filter_duplicate_topics(topics: list, posted_topics: list) -> list:
+    """Remove topics that were already posted"""
+    if not posted_topics:
+        return topics
+    
+    filtered = []
+    for topic in topics:
+        if is_similar_topic(topic["title"], posted_topics):
+            print(f"   ⏭️ Skipping (similar to posted): {topic['title'][:50]}...")
+        else:
+            filtered.append(topic)
+    
+    # If all topics filtered, return original (better to post something than nothing)
+    if not filtered:
+        print("   ⚠️ All topics similar to posted, using least similar...")
+        return topics[:3]
+    
+    return filtered
+
+
 def search_trending_topics() -> list:
     """Search Google News RSS for trending Android topics"""
     print("\n🔍 Searching for trending Android topics...")
@@ -186,7 +252,7 @@ def search_trending_topics() -> list:
             print(f"   ⚠️ Search error for '{query}': {e}")
             continue
 
-    # Remove duplicates and limit to 5
+    # Remove duplicates
     seen_titles = set()
     unique_results = []
     for r in all_results:
@@ -201,7 +267,13 @@ def search_trending_topics() -> list:
         print("   ⚠️ Using fallback trending topics...")
         unique_results = get_fallback_topics()
 
-    print(f"\n✅ Found {len(unique_results)} unique topics")
+    # Filter out already posted topics
+    posted_topics = get_posted_topics()
+    if posted_topics:
+        print(f"\n📚 Found {len(posted_topics)} previously posted topics")
+        unique_results = filter_duplicate_topics(unique_results, posted_topics)
+
+    print(f"\n✅ Found {len(unique_results)} fresh topics")
     return unique_results[:5]
 
 
@@ -273,7 +345,11 @@ def pick_best_topic(topics: list) -> dict:
     for i, t in enumerate(topics, 1):
         topics_text += f"\n{i}. **{t['title']}**\n   {t['body']}\n   Source: {t['source']}\n"
 
-    prompt = TOPIC_PICKER_PROMPT.format(topics=topics_text)
+    # Get posted topics to inform AI
+    posted_topics = get_posted_topics()
+    posted_text = "\n".join([f"- {t}" for t in posted_topics[-10:]]) if posted_topics else "None yet"
+
+    prompt = TOPIC_PICKER_PROMPT.format(topics=topics_text, posted_topics=posted_text)
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -467,7 +543,7 @@ def main(dry_run: bool = False):
         return
 
     try:
-        # Step 1: Search trending topics
+        # Step 1: Search trending topics (with duplicate filtering)
         topics = search_trending_topics()
 
         if not topics:
