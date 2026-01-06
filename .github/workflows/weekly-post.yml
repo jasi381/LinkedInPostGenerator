@@ -1,0 +1,42 @@
+name: Weekly LinkedIn Post
+
+on:
+  # Schedule: Every Wednesday at 8:30 AM IST (3:00 AM UTC)
+  schedule:
+    - cron: '0 3 * * 3'
+
+  # Manual trigger button in GitHub
+  workflow_dispatch:
+
+jobs:
+  post-to-linkedin:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install requests
+
+      - name: 🤖 Run LinkedIn AI Poster
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+        run: |
+          python linkedin_ai_poster.py
+
+      - name: 📝 Save post history
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-history
+          path: post_history.json
+          retention-days: 90

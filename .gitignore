@@ -1,0 +1,29 @@
+# Environment variables - NEVER COMMIT!
+.env
+.env.local
+.env.*.local
+
+# LinkedIn tokens - contains access tokens
+linkedin_tokens.json
+
+# Post history
+post_history.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
