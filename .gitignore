@@ -6,8 +6,6 @@
 # LinkedIn tokens - contains access tokens
 linkedin_tokens.json
 
-# Post history
-post_history.json
 
 # Python
 __pycache__/
