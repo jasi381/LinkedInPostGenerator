@@ -41,6 +41,12 @@
       "topic": "Google TV Enhancements: Gemini, Video API & Jetpack Compose",
       "post_preview": "Just spent the weekend digging into the latest Google TV enhancements and I'm blown away by the pote...",
       "post_id": "urn:li:share:7419592017933987843"
+    },
+    {
+      "date": "2026-01-28T04:10:00.627628",
+      "topic": "Jetpack Compose Brings Performance Improvements, Better Tooling Integration, and Updates Material 3",
+      "post_preview": "Just spent the last week migrating our healthcare app to Jetpack Compose and I'm blown away by the p...",
+      "post_id": "urn:li:share:7422128791793188865"
     }
   ]
 }
